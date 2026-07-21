@@ -1,0 +1,59 @@
+@import "tailwindcss";
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+}
+
+body{
+  font-family:'Inter',sans-serif;
+  background:#0F172A;
+  color:white;
+}
+
+a{
+  text-decoration:none;
+  color:inherit;
+}
+
+button{
+  cursor:pointer;
+}
+
+input{
+  outline:none;
+}
+.prose pre {
+  border-radius: 12px;
+  padding: 16px;
+  overflow-x: auto;
+}
+
+.prose code {
+  font-size: 14px;
+}
+
+.prose p {
+  margin: 12px 0;
+}
+
+.prose ul {
+  list-style: disc;
+  margin-left: 20px;
+}
+
+.prose ol {
+  list-style: decimal;
+  margin-left: 20px;
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.prose th,
+.prose td {
+  border: 1px solid #334155;
+  padding: 8px;
+}

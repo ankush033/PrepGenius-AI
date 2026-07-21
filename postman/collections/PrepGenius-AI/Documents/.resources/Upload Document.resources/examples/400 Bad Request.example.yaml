@@ -1,0 +1,17 @@
+$kind: http-example
+name: '400 Bad Request'
+request:
+  url: 'http://localhost:5000/api/documents/upload'
+  method: POST
+response:
+  statusCode: 400
+  statusText: Bad Request
+  headers:
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "message": "No File Uploaded"
+      }
