@@ -163,18 +163,24 @@ npm run dev
 ---
 
 ## 📷 Screenshots
+### Register Page
+<img width="1897" height="857" alt="image" src="https://github.com/user-attachments/assets/238a27d5-bb1c-4892-9cb1-7d7579a4f9ed" />
+
 
 ### Login Page
 
-(Add Screenshot)
+<img width="1916" height="865" alt="image" src="https://github.com/user-attachments/assets/7320d15c-a009-4fd1-b6c3-b101fc36b8e7" />
+
 
 ### Dashboard
 
-(Add Screenshot)
+<img width="1915" height="860" alt="image" src="https://github.com/user-attachments/assets/4442858b-c6e9-4dcd-939c-4640021b33f7" />
+
 
 ### AI Chat
 
-(Add Screenshot)
+<img width="1917" height="863" alt="image" src="https://github.com/user-attachments/assets/c1c49857-509a-414c-ba58-bdffa27f625a" />
+
 
 ---
 
