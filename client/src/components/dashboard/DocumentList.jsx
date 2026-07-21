@@ -93,10 +93,7 @@ function DocumentList({ refreshDocs }) {
 
         <div className="relative mt-5">
 
-          <Search
-            size={18}
-            className="absolute left-3 top-3 text-slate-500"
-          />
+         
 
           <input
             value={search}
