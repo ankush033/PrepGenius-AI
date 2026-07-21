@@ -208,6 +208,3 @@ Ankush Gupta
 
 GitHub:
 https://github.com/ankush033
-
-LinkedIn:
-(Add your LinkedIn)
