@@ -15,10 +15,10 @@ node_modules/
 # ==========================
 server/config/google-key.json
 
-# ==========================
+
 # Uploads
-# ==========================
-server/uploads/
+server/uploads/*
+!server/uploads/.gitkeep
 
 # ==========================
 # Build Files
