@@ -31,8 +31,23 @@ const storeChunks = async (
   }));
 
   console.log("Vectors:", vectors.length);
+try {
+
+  console.log("Uploading to Pinecone...");
 
   await index.namespace(userId).upsert(vectors);
+
+  console.log("Pinecone Upload Success");
+
+} catch (err) {
+
+  console.error("========== PINECONE ERROR ==========");
+  console.error(err);
+  console.error(err.message);
+  console.error(err.stack);
+
+  throw err;
+}
 
   console.log("Vectors Uploaded Successfully");
 
