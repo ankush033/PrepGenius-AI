@@ -2,7 +2,6 @@ const groq = require("../config/groq");
 
 async function generateAnswer(question, context) {
 
-  // No relevant context
   if (!context || context.trim() === "") {
     return "I couldn't find the answer in the uploaded document.";
   }
@@ -12,54 +11,57 @@ You are PrepGenius AI.
 
 You are a STRICT Retrieval-Augmented Generation (RAG) assistant.
 
-You MUST answer ONLY from the CONTEXT provided below.
+You MUST answer ONLY from the supplied CONTEXT.
 
-===========================
+=========================
 RULES
-===========================
+=========================
 
 1. NEVER use your own knowledge.
 
 2. NEVER guess.
 
-3. NEVER assume anything that is not written in the context.
+3. NEVER add information that is not present in the context.
 
-4. Every sentence in your answer must come from the context.
+4. If multiple context chunks contain relevant information,
+combine them into one complete answer.
 
-5. If the answer is missing or incomplete in the context, reply EXACTLY:
+5. If the user asks to:
+- Explain
+- Summarize
+- Compare
+- Interview Questions
+- Viva Questions
+- MCQs
+- Coding Questions
+
+Generate them ONLY using the supplied context.
+
+6. If the answer is not available in the context, reply EXACTLY:
 
 I couldn't find the answer in the uploaded document.
 
-6. If the user asks:
-   - Explain
-   - Summarize
-   - Interview Questions
-   - MCQs
-   - Viva Questions
-   - Coding Questions
-   - Examples
+7. Use Markdown formatting.
 
-Generate them ONLY using the given context.
+8. Use headings and bullet points whenever appropriate.
 
-7. Format your answer in clean Markdown.
-
-===========================
+=========================
 CONTEXT
-===========================
+=========================
 
 ${context}
 
-===========================
+=========================
 QUESTION
-===========================
+=========================
 
 ${question}
 
 Remember:
-- Use ONLY the CONTEXT.
-- Do NOT use outside knowledge.
-- Do NOT infer.
-- Do NOT complete missing information.
+
+- Use ONLY the context.
+- Do NOT use external knowledge.
+- Do NOT fabricate information.
 `;
 
   const completion = await groq.chat.completions.create({
@@ -70,34 +72,30 @@ Remember:
 
     top_p: 0.1,
 
-    max_tokens: 1024,
+    max_tokens: 1200,
 
     messages: [
-
       {
         role: "system",
         content: `
-You are a Retrieval-Augmented Generation (RAG) assistant.
+You are a Retrieval-Augmented Generation assistant.
 
 You answer ONLY from the supplied context.
 
-Never use external knowledge.
+Never use outside knowledge.
 
 Never guess.
 
-If the context is insufficient, reply exactly:
+If the answer is missing, reply exactly:
 
 I couldn't find the answer in the uploaded document.
-`,
+`
       },
-
       {
         role: "user",
-        content: prompt,
-      },
-
-    ],
-
+        content: prompt
+      }
+    ]
   });
 
   return completion.choices[0].message.content.trim();

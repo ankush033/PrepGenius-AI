@@ -31,25 +31,22 @@ const storeChunks = async (
   }));
 
   console.log("Vectors:", vectors.length);
-try {
 
-  console.log("Uploading to Pinecone...");
+  try {
 
-  await index.namespace(userId).upsert(vectors);
+    console.log("Uploading to Pinecone...");
 
-  console.log("Pinecone Upload Success");
+    await index.namespace(userId).upsert(vectors);
 
-} catch (err) {
+    console.log("Pinecone Upload Success");
 
-  console.error("========== PINECONE ERROR ==========");
-  console.error(err);
-  console.error(err.message);
-  console.error(err.stack);
+  } catch (err) {
 
-  throw err;
-}
+    console.error("========== PINECONE ERROR ==========");
+    console.error(err);
 
-  console.log("Vectors Uploaded Successfully");
+    throw err;
+  }
 
   return true;
 };
@@ -62,14 +59,31 @@ const searchChunks = async (embedding, userId) => {
   console.log("Searching Pinecone...");
 
   const result = await index.namespace(userId).query({
+
     vector: embedding,
-    topK: 5,
+
+    topK: 10,
+
     includeMetadata: true,
+
   });
 
   console.log("Matches Found:", result.matches.length);
 
+  result.matches.forEach((match, index) => {
+
+    console.log({
+      index: index + 1,
+      score: match.score,
+      file: match.metadata?.fileName,
+      page: match.metadata?.page,
+      preview: match.metadata?.text?.substring(0, 120),
+    });
+
+  });
+
   return result.matches;
+
 };
 
 // ==========================
@@ -80,14 +94,21 @@ const deleteDocumentVectors = async (userId, documentId) => {
   console.log("Deleting Vectors...");
 
   await index.namespace(userId).deleteMany({
+
     documentId,
+
   });
 
   console.log("Vectors Deleted Successfully");
+
 };
 
 module.exports = {
+
   storeChunks,
+
   searchChunks,
+
   deleteDocumentVectors,
+
 };

@@ -1,20 +1,17 @@
+
 const generateEmbedding = require("../services/embeddingService");
 const { searchChunks } = require("../services/pineconeService");
 const generateAnswer = require("../services/geminiService");
 
 const Conversation = require("../models/Conversation");
 const Message = require("../models/Message");
-
-
-console.log("Conversation Model:", Conversation);
-console.log("Type:", typeof Conversation);
+const Chat = require("../models/Chat");
 // ======================================================
 // Create New Conversation
 // ======================================================
 
 exports.createConversation = async (req, res) => {
   try {
-
     const conversation = await Conversation.create({
       user: req.user.id,
       title: "New Chat",
@@ -24,16 +21,13 @@ exports.createConversation = async (req, res) => {
       success: true,
       conversation,
     });
-
   } catch (error) {
-
-    console.error(error);
+    console.error("Create Conversation Error:", error);
 
     return res.status(500).json({
       success: false,
       message: error.message,
     });
-
   }
 };
 
@@ -43,7 +37,6 @@ exports.createConversation = async (req, res) => {
 
 exports.getConversations = async (req, res) => {
   try {
-
     const conversations = await Conversation.find({
       user: req.user.id,
     })
@@ -54,25 +47,22 @@ exports.getConversations = async (req, res) => {
       success: true,
       conversations,
     });
-
   } catch (error) {
-
-    console.error(error);
+    console.error("Get Conversations Error:", error);
 
     return res.status(500).json({
       success: false,
       message: error.message,
     });
-
   }
 };
+
 // ======================================================
 // Get Single Conversation
 // ======================================================
 
 exports.getConversation = async (req, res) => {
   try {
-
     const { conversationId } = req.params;
 
     const conversation = await Conversation.findOne({
@@ -98,19 +88,15 @@ exports.getConversation = async (req, res) => {
       conversation,
       messages,
     });
-
   } catch (error) {
-
-    console.error(error);
+    console.error("Get Conversation Error:", error);
 
     return res.status(500).json({
       success: false,
       message: error.message,
     });
-
   }
 };
-
 // ======================================================
 // Send Message
 // ======================================================
@@ -185,14 +171,15 @@ matches.forEach((m, i) => {
 });
 
 // Similarity Threshold
-const SIMILARITY_THRESHOLD = process.env.SIMILARITY_THRESHOLD || 0.60;
+const SIMILARITY_THRESHOLD =
+Number(process.env.SIMILARITY_THRESHOLD) || 0.35;
 
 // Filter Matches
 const filteredMatches = matches.filter(
   (m) => m.score >= SIMILARITY_THRESHOLD
 );
 
-
+filteredMatches.sort((a, b) => b.score - a.score);
 
 
 console.log(
@@ -206,38 +193,47 @@ console.log(
 
     if (filteredMatches.length > 0) {
 
-      const context =
-        filteredMatches
-          .map(
-            (match) =>
-              match.metadata.text
-          )
-          .join("\n\n-----------------\n\n");
+   const context = filteredMatches
+  .map(
+    (match, index) => `
+Source ${index + 1}
 
+File: ${match.metadata.fileName}
+
+Page: ${match.metadata.page || 1}
+
+Similarity: ${match.score.toFixed(2)}
+
+Content:
+${match.metadata.text}
+`
+  )
+  .join("\n\n-----------------------\n\n");
+
+console.log("========== CONTEXT ==========");
+console.log(context);
       answer =
         await generateAnswer(
           question,
           context
         );
 
-      sources =
-        filteredMatches.map((match) => ({
+ sources = filteredMatches.map((match) => ({
+  fileName: match.metadata.fileName,
+  page: match.metadata.page || 1,
+  score: Number(match.score.toFixed(3)),
+  text: match.metadata.text,
+}));
+   filteredMatches.forEach((match, index) => {
+  console.log(`========== MATCH ${index + 1} ==========`);
 
-          fileName:
-            match.metadata.fileName,
-
-          score:
-            match.score,
-          
-          text:
-            match.metadata.text,
-
-        }));
-        filteredMatches.forEach((match, index) => {
-  console.log("Match", index);
-  console.log(match.metadata);
+  console.log({
+    score: match.score,
+    file: match.metadata.fileName,
+    page: match.metadata.page,
+    text: match.metadata.text.substring(0, 150),
+  });
 });
-
     }
 
     // -------------------------
@@ -292,7 +288,7 @@ console.log(
 
   } catch (error) {
 
-    console.error(error);
+    console.error("Send Message Error:", error);
 
     return res.status(500).json({
 
@@ -305,7 +301,7 @@ console.log(
   }
 
 };
-const Chat = require("../models/Chat");
+
 
 // ======================================================
 // Delete Conversation
@@ -342,7 +338,7 @@ exports.deleteConversation = async (req, res) => {
 
   } catch (error) {
 
-    console.error(error);
+    console.error("Delete Conversation Error:", error);
 
     return res.status(500).json({
       success: false,
@@ -398,7 +394,7 @@ exports.renameConversation = async (req, res) => {
 
   } catch (error) {
 
-    console.error(error);
+   console.error("Rename Conversation Error:", error);
 
     return res.status(500).json({
       success: false,
@@ -445,8 +441,12 @@ matches.forEach((m, i) => {
   });
 });
 
-const filteredMatches = matches;
+const SIMILARITY_THRESHOLD =
+Number(process.env.SIMILARITY_THRESHOLD ?? 0.30);
 
+const filteredMatches = matches
+  .filter(match => match.score >= SIMILARITY_THRESHOLD)
+  .sort((a, b) => b.score - a.score);
 console.log(
   "Filtered Matches:",
   filteredMatches.length
@@ -458,26 +458,32 @@ console.log(
     let sources = [];
 
     if (filteredMatches.length > 0) {
+const context = filteredMatches
+  .map((match, index) => `
+Source ${index + 1}
 
-      const context =
-        filteredMatches
-          .map(
-            (match) =>
-              match.metadata.text
-          )
-          .join("\n\n-----------------\n\n");
+File: ${match.metadata.fileName}
 
+Page: ${match.metadata.page || 1}
+
+Similarity: ${match.score.toFixed(2)}
+
+Content:
+${match.metadata.text}
+`)
+  .join("\n\n-----------------------\n\n");
       answer =
         await generateAnswer(
           question,
           context
         );
 
-      sources =
-        filteredMatches.map((match) => ({
-          fileName: match.metadata.fileName,
-          score: match.score,
-        }));
+    sources = filteredMatches.map((match) => ({
+  fileName: match.metadata.fileName,
+  page: match.metadata.page || 1,
+  score: Number(match.score.toFixed(3)),
+  text: match.metadata.text,
+}));
 
     }
 
