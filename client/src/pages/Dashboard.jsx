@@ -10,6 +10,8 @@ import { getDashboardStats } from "../services/dashboardService";
 
 function Dashboard() {
   const [refreshDocs, setRefreshDocs] = useState(0);
+  const [suggestionRequest, setSuggestionRequest] = useState(null);
+  const [selectedDocument, setSelectedDocument] = useState(null);
 
   const [stats, setStats] = useState({
     documents: 0,
@@ -18,8 +20,9 @@ function Dashboard() {
     aiStatus: "Offline",
   });
 
-  const handleDocumentUploaded = () => {
+  const handleDocumentUploaded = (document) => {
     setRefreshDocs((prev) => prev + 1);
+    setSelectedDocument(document || null);
   };
 
   async function loadStats() {
@@ -38,7 +41,6 @@ function Dashboard() {
   return (
     <DashboardLayout>
       {({
-        conversations,
         setConversations,
         activeConversation,
         setActiveConversation,
@@ -50,9 +52,10 @@ function Dashboard() {
             <ChatBox
               activeConversation={activeConversation}
               setActiveConversation={setActiveConversation}
-              conversations={conversations}
               setConversations={setConversations}
               onDocumentUploaded={handleDocumentUploaded}
+              selectedDocument={selectedDocument}
+              suggestionRequest={suggestionRequest}
             />
           </section>
 
@@ -90,7 +93,11 @@ function Dashboard() {
             </div>
 
             <div className="flex-1 min-h-0">
-              <DocumentList refreshDocs={refreshDocs} />
+              <DocumentList
+                refreshDocs={refreshDocs}
+                onQuestionSelect={(text) => setSuggestionRequest({ text })}
+                onDocumentSelect={setSelectedDocument}
+              />
             </div>
           </aside>
         </div>

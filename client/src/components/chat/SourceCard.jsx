@@ -12,6 +12,10 @@ function SourceCard({ source }) {
           {source.fileName}
         </h3>
 
+        <p className="text-slate-300 text-sm">
+          Page {source.page || 1}
+        </p>
+
         <p className="text-green-400 text-sm">
           Similarity: {(source.score * 100).toFixed(1)}%
         </p>

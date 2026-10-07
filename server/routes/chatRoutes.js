@@ -11,22 +11,7 @@ const {
   sendMessage,
   deleteConversation,
    renameConversation, 
-
-  // Old APIs (Backward Compatibility)
-  chat,
-  getChatHistory,
-
 } = require("../controllers/chatController");
-
-/*
-|--------------------------------------------------------------------------
-| Old APIs (Current Frontend)
-|--------------------------------------------------------------------------
-*/
-
-router.post("/", auth, chat);
-
-router.get("/history", auth, getChatHistory);
 
 /*
 |--------------------------------------------------------------------------

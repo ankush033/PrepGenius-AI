@@ -19,8 +19,14 @@ const storeChunks = async (
       userId,
       documentId,
       fileName,
-
+      page_number:
+        chunk.metadata?.page_number ??
+        chunk.metadata?.loc?.pageNumber ??
+        chunk.metadata?.page ??
+        1,
+      // Keep `page` for vectors uploaded before page_number was introduced.
       page:
+        chunk.metadata?.page_number ??
         chunk.metadata?.loc?.pageNumber ??
         chunk.metadata?.page ??
         1,
@@ -76,7 +82,7 @@ const searchChunks = async (embedding, userId) => {
       index: index + 1,
       score: match.score,
       file: match.metadata?.fileName,
-      page: match.metadata?.page,
+      page: match.metadata?.page_number ?? match.metadata?.page,
       preview: match.metadata?.text?.substring(0, 120),
     });
 

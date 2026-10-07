@@ -27,6 +27,16 @@ const documentSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+
+    summary: {
+      type: String,
+      default: "",
+    },
+
+    suggestedQuestions: {
+      type: [String],
+      default: [],
+    },
   },
   {
     timestamps: true,

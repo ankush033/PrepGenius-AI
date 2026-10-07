@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Bot, Sparkles } from "lucide-react";
 
 import api from "../../services/api";
@@ -17,17 +17,42 @@ import {
 function ChatBox({
   activeConversation,
   setActiveConversation,
-  conversations,
   setConversations,
   onDocumentUploaded,
+  selectedDocument,
+  suggestionRequest,
 })  {
   const [messages, setMessages] = useState([]);
 const [question, setQuestion] = useState("");
 const [loading, setLoading] = useState(false);
 const [showUploadModal, setShowUploadModal] =
   useState(false);
+const [documentQuestions, setDocumentQuestions] = useState([]);
+const [preparingQuestions, setPreparingQuestions] = useState(false);
 
 const chatRef = useRef(null);
+const activeConversationId = activeConversation?._id;
+
+const loadConversation = useCallback(async () => {
+  if (!activeConversationId) {
+    setMessages([]);
+    return;
+  }
+
+  try {
+    const res = await api.get(`/chat/${activeConversationId}`);
+    const history = res.data.messages.map((msg) => ({
+      role: msg.role,
+      text: msg.content,
+      sources: msg.sources || [],
+    }));
+
+    setMessages(history);
+    localStorage.setItem("activeConversation", activeConversationId);
+  } catch (err) {
+    console.log(err);
+  }
+}, [activeConversationId]);
 
   // ==========================
   // Load Conversation
@@ -35,18 +60,21 @@ const chatRef = useRef(null);
   // ==========================
 
 useEffect(() => {
-
-  if (activeConversation) {
-
-    loadConversation();
-
-  } else {
-
-    setMessages([]);
-
+  loadConversation();
+}, [loadConversation]);
+useEffect(() => {
+  if (suggestionRequest?.text) {
+    setQuestion(suggestionRequest.text);
   }
-
-}, [activeConversation]);
+}, [suggestionRequest]);
+useEffect(() => {
+  if (selectedDocument) {
+    setPreparingQuestions(false);
+    setDocumentQuestions(Array.isArray(selectedDocument.suggestedQuestions)
+      ? selectedDocument.suggestedQuestions.slice(0, 3)
+      : []);
+  }
+}, [selectedDocument]);
 useEffect(() => {
 
   if (chatRef.current) {
@@ -57,13 +85,17 @@ useEffect(() => {
   }
 
 }, [messages, loading]);
- function handleUploadSuccess() {
+ function handleUploadSuccess(document) {
 
   setShowUploadModal(false);
+  setPreparingQuestions(false);
+  setDocumentQuestions(Array.isArray(document?.suggestedQuestions)
+    ? document.suggestedQuestions.slice(0, 3)
+    : []);
 
   if (onDocumentUploaded) {
 
-    onDocumentUploaded();
+    onDocumentUploaded(document);
 
   }
 
@@ -117,45 +149,11 @@ async function refreshConversations() {
   // Load Messages
   // ==========================
 
- async function loadConversation() {
-
-  try {
-
-    const res = await api.get(
-      `/chat/${activeConversation._id}`
-    );
-        console.log("Conversation API Response");
-    console.log(res.data.messages);
-    const history = res.data.messages.map((msg) => ({
-
-      role: msg.role,
-
-      text: msg.content,
-
-      sources: msg.sources || [],
-
-    }));
-
-    setMessages(history);
-    localStorage.setItem(
-  "activeConversation",
-  activeConversation._id
-);
-
-  } catch (err) {
-
-    console.log(err);
-
-  }
-
-}
-
-
   // ==========================
   // Send Question
   // ==========================
 
-  async function sendQuestion() {
+  async function sendQuestion(questionOverride) {
 
   if (!activeConversation) {
 
@@ -165,9 +163,12 @@ async function refreshConversations() {
 
   }
 
-  if (!question.trim()) return;
+  const textToSend = (questionOverride ?? question).trim();
+  if (!textToSend) return;
 
-  const currentQuestion = question;
+  const currentQuestion = textToSend;
+  const conversationId = activeConversation._id;
+  const streamId = `stream-${Date.now()}`;
 
   // Show user message instantly
 
@@ -177,6 +178,12 @@ async function refreshConversations() {
       role: "user",
       text: currentQuestion,
     },
+    {
+      id: streamId,
+      role: "assistant",
+      text: "",
+      sources: [],
+    },
   ]);
 
   setQuestion("");
@@ -185,29 +192,68 @@ async function refreshConversations() {
 
     setLoading(true);
 
-    const res = await api.post(
-      `/chat/${activeConversation._id}`,
+    const token = localStorage.getItem("token");
+    const response = await fetch(
+      `${api.defaults.baseURL}/chat/${conversationId}`,
       {
-        question: currentQuestion,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ question: currentQuestion }),
       }
     );
-console.log("Full Response:", res.data);
-console.log("Sources:", res.data.sources);
 
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      throw new Error(errorBody.message || `Chat request failed (${response.status})`);
+    }
+    if (!response.body) throw new Error("Streaming is not supported by this browser.");
 
- 
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let completed = false;
 
+    const handleEvent = (rawEvent) => {
+      const data = rawEvent
+        .split("\n")
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trimStart())
+        .join("\n");
+      if (!data) return;
 
-    // Show AI message instantly
+      const event = JSON.parse(data);
+      if (event.type === "token") {
+        setMessages((prev) => prev.map((message) =>
+          message.id === streamId
+            ? { ...message, text: message.text + event.token }
+            : message
+        ));
+      } else if (event.type === "done") {
+        completed = true;
+        setMessages((prev) => prev.map((message) =>
+          message.id === streamId
+            ? { ...message, text: event.answer, sources: event.sources || [] }
+            : message
+        ));
+      } else if (event.type === "error") {
+        throw new Error(event.message || "The AI response failed.");
+      }
+    };
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "assistant",
-        text: res.data.answer,
-        sources: res.data.sources || [],
-      },
-    ]);
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+      const events = buffer.split("\n\n");
+      buffer = events.pop() || "";
+      events.forEach(handleEvent);
+      if (done) break;
+    }
+    if (buffer.trim()) handleEvent(buffer);
+    if (!completed) throw new Error("The response stream ended unexpectedly.");
 
     // Refresh sidebar
     await refreshConversations();
@@ -219,14 +265,11 @@ console.log("Sources:", res.data.sources);
 
     console.log(err);
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "assistant",
-        text: "Something went wrong.",
-        sources: [],
-      },
-    ]);
+    setMessages((prev) => prev.map((message) =>
+      message.id === streamId
+        ? { ...message, text: message.text || err.message || "Something went wrong." }
+        : message
+    ));
 
   } finally {
 
@@ -301,6 +344,31 @@ console.log("Sources:", res.data.sources);
       {/* Input */}
 
       <div className="flex-shrink-0 border-t border-slate-700 bg-slate-900/95 backdrop-blur px-5 py-4">
+     {(preparingQuestions || documentQuestions.length > 0) && (
+       <div className="mb-3" aria-live="polite">
+         {preparingQuestions ? (
+           <p className="text-xs text-slate-400">Preparing questions from your document...</p>
+         ) : (
+           <>
+             <p className="mb-2 text-xs font-medium text-slate-400">You can ask:</p>
+             <div className="flex flex-wrap gap-2">
+               {documentQuestions.map((suggestedQuestion, index) => (
+                 <button
+                   key={`${index}-${suggestedQuestion}`}
+                   type="button"
+                   disabled={loading}
+                   onClick={() => sendQuestion(suggestedQuestion)}
+                   className="max-w-full truncate rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-left text-xs text-cyan-200 transition hover:border-cyan-400 hover:bg-cyan-500/20 disabled:opacity-50"
+                   title={suggestedQuestion}
+                 >
+                   {suggestedQuestion}
+                 </button>
+               ))}
+             </div>
+           </>
+         )}
+       </div>
+     )}
      <ChatInput
     value={question}
     setValue={setQuestion}
@@ -314,7 +382,11 @@ console.log("Sources:", res.data.sources);
     </div>
     <Modal isOpen={showUploadModal} onClose={() => setShowUploadModal(false)} title="Upload Study Material">
 
-  <UploadBox  onUploadSuccess={handleUploadSuccess} />
+  <UploadBox
+    onUploadStart={() => { setDocumentQuestions([]); setPreparingQuestions(true); }}
+    onUploadFailure={() => setPreparingQuestions(false)}
+    onUploadSuccess={handleUploadSuccess}
+  />
 </Modal>
 </>
   );

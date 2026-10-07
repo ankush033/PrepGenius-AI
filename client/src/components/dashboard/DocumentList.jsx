@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import api from "../../services/api";
 import DocumentCard from "./DocumentCard";
-import { FolderOpen, Search } from "lucide-react";
+import { FolderOpen } from "lucide-react";
 
-function DocumentList({ refreshDocs }) {
+function DocumentList({ refreshDocs, onQuestionSelect, onDocumentSelect }) {
 
   const [documents, setDocuments] = useState([]);
   const [search, setSearch] = useState("");
+  const [expandedDocumentId, setExpandedDocumentId] = useState(null);
 
   useEffect(() => {
 
@@ -41,6 +42,7 @@ function DocumentList({ refreshDocs }) {
       setDocuments((prev) =>
         prev.filter((doc) => doc._id !== id)
       );
+      setExpandedDocumentId((currentId) => currentId === id ? null : currentId);
 
     } catch (err) {
 
@@ -129,7 +131,14 @@ function DocumentList({ refreshDocs }) {
               <DocumentCard
                 key={doc._id}
                 document={doc}
+                expanded={expandedDocumentId === doc._id}
+                onToggle={() => {
+                  const isExpanded = expandedDocumentId === doc._id;
+                  setExpandedDocumentId(isExpanded ? null : doc._id);
+                  onDocumentSelect?.(isExpanded ? null : doc);
+                }}
                 onDelete={deleteDocument}
+                onQuestionSelect={onQuestionSelect}
               />
 
             ))

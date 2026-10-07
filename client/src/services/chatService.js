@@ -75,13 +75,3 @@ export const renameConversation = async (
 
   return res.data;
 };
-
-// ==============================
-// Old Chat History
-// (Backward Compatibility)
-// ==============================
-
-export const getChatHistory = async () => {
-  const res = await api.get("/chat/history");
-  return res.data;
-};

@@ -9,6 +9,8 @@ node_modules/
 # ==========================
 .env
 **/.env
+.env.*
+**/.env.*
 
 # ==========================
 # Google Service Account Key
@@ -19,6 +21,7 @@ server/config/google-key.json
 # Uploads
 server/uploads/*
 !server/uploads/.gitkeep
+server/eng.traineddata
 
 # ==========================
 # Build Files

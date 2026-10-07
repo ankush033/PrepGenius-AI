@@ -7,6 +7,7 @@ function ChatInput({
   loading,
   onUploadClick,
 }) {
+  const canSend = value.trim().length > 0 && !loading;
 
   const handleKeyDown = (e) => {
 
@@ -58,9 +59,11 @@ function ChatInput({
       {/* Send */}
 
       <button
-        disabled={loading}
-        onClick={onSend}
-        className="h-14 w-14 rounded-2xl bg-cyan-500 hover:bg-cyan-400 transition flex items-center justify-center disabled:opacity-50"
+        type="button"
+        disabled={!canSend}
+        onClick={() => onSend()}
+        aria-label="Send message"
+        className="h-14 w-14 shrink-0 rounded-2xl bg-cyan-500 hover:bg-cyan-400 transition flex items-center justify-center disabled:opacity-50"
       >
 
         <Send size={20} />

@@ -7,12 +7,17 @@ import {
 
 import api from "../../services/api";
 
+const MAX_FILE_SIZE = 100 * 1024 * 1024;
+
 function UploadBox({
   onUploadSuccess,
+  onUploadStart,
+  onUploadFailure,
 }) {
 
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [uploadSent, setUploadSent] = useState(false);
 
   async function handleUpload() {
 
@@ -23,6 +28,8 @@ function UploadBox({
     try {
 
       setLoading(true);
+      setUploadSent(false);
+      onUploadStart?.();
 
       const formData = new FormData();
 
@@ -32,9 +39,10 @@ function UploadBox({
         "/documents/upload",
         formData,
         {
-          headers: {
-            "Content-Type":
-              "multipart/form-data",
+          onUploadProgress: (event) => {
+            if (event.total && event.loaded >= event.total) {
+              setUploadSent(true);
+            }
           },
         }
       );
@@ -43,20 +51,22 @@ function UploadBox({
 
       setFile(null);
 
-      if (onUploadSuccess) {
-        onUploadSuccess();
-      }
+      onUploadSuccess?.(res.data.document);
 
     } catch (err) {
 
+      onUploadFailure?.();
+
       alert(
         err.response?.data?.message ||
-        "Upload Failed"
+        err.message ||
+        "Upload failed. Check the server logs for the failed pipeline stage."
       );
 
     } finally {
 
       setLoading(false);
+      setUploadSent(false);
 
     }
 
@@ -103,16 +113,23 @@ function UploadBox({
         </p>
 
         <span className="text-slate-400 text-sm mt-2">
-          PDF only
+          PDF only · 100 MB maximum
         </span>
 
         <input
           type="file"
           accept=".pdf"
           hidden
-          onChange={(e) =>
-            setFile(e.target.files[0])
-          }
+          onChange={(e) => {
+            const selectedFile = e.target.files[0];
+            if (selectedFile && selectedFile.size > MAX_FILE_SIZE) {
+              alert("PDF must be 100 MB or smaller.");
+              e.target.value = "";
+              setFile(null);
+              return;
+            }
+            setFile(selectedFile || null);
+          }}
         />
 
       </label>
@@ -130,7 +147,7 @@ function UploadBox({
               size={18}
             />
 
-            Uploading...
+            {uploadSent ? "PDF received; processing…" : "Uploading PDF…"}
 
           </>
         ) : (
