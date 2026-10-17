@@ -16,6 +16,7 @@ const auth = (req, res, next) => {
       ? authHeader.split(" ")[1]
       : authHeader;
 
+    if (!process.env.JWT_SECRET || !token) throw new Error("Invalid token");
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     req.user = decoded;
@@ -23,7 +24,6 @@ const auth = (req, res, next) => {
     next();
 
   } catch (err) {
-    console.log(err);
     return res.status(401).json({
       success: false,
       message: "Invalid Token",

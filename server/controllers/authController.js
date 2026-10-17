@@ -43,9 +43,8 @@ exports.register = async (req, res) => {
 
     } catch (error) {
 
-        res.status(500).json({
-            message: error.message,
-        });
+        console.error("Registration failed.");
+        res.status(500).json({ message: "Unable to register. Please try again." });
 
     }
 };
@@ -104,9 +103,8 @@ exports.login = async (req, res) => {
 
     } catch (error) {
 
-        res.status(500).json({
-            message: error.message,
-        });
+        console.error("Login failed.");
+        res.status(500).json({ message: "Unable to log in. Please try again." });
 
     }
 

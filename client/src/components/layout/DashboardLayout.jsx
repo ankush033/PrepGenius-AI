@@ -11,6 +11,7 @@ function DashboardLayout({ children }) {
 
   const [activeConversation, setActiveConversation] =
     useState(null);
+  const [loadError, setLoadError] = useState("");
 
   // ===========================
   // Load conversations once
@@ -31,6 +32,7 @@ function DashboardLayout({ children }) {
       const chats = res.conversations || [];
 
       setConversations(chats);
+      setLoadError("");
 
       if (chats.length === 0) {
 
@@ -61,9 +63,8 @@ function DashboardLayout({ children }) {
 
       setActiveConversation(chats[0]);
 
-    } catch (err) {
-
-      console.log(err);
+    } catch {
+      setLoadError("Unable to load your conversations. Please refresh the page.");
 
     }
 
@@ -85,6 +86,8 @@ function DashboardLayout({ children }) {
         />
 
         <main className="flex-1 min-h-0 overflow-hidden p-5">
+
+          {loadError && <p role="alert" className="mb-3 text-sm text-amber-300">{loadError}</p>}
 
           {children({
             conversations,

@@ -68,10 +68,7 @@ async function generateDocumentInsights(text) {
       ],
     });
   } catch (error) {
-    const failure = new Error(
-      `Document insights generation failed: ${error.message || "Groq request failed."}`
-    );
-    failure.cause = error;
+    const failure = new Error("Document insights generation failed.");
     throw failure;
   }
 

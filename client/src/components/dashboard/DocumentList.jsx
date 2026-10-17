@@ -8,6 +8,7 @@ function DocumentList({ refreshDocs, onQuestionSelect, onDocumentSelect }) {
   const [documents, setDocuments] = useState([]);
   const [search, setSearch] = useState("");
   const [expandedDocumentId, setExpandedDocumentId] = useState(null);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
 
@@ -22,10 +23,10 @@ function DocumentList({ refreshDocs, onQuestionSelect, onDocumentSelect }) {
       const res = await api.get("/documents");
 
       setDocuments(res.data.documents);
+      setLoadError("");
 
-    } catch (err) {
-
-      console.log(err);
+    } catch {
+      setLoadError("Unable to load your documents. Please refresh and try again.");
 
     }
 
@@ -46,7 +47,7 @@ function DocumentList({ refreshDocs, onQuestionSelect, onDocumentSelect }) {
 
     } catch (err) {
 
-      alert(err.response?.data?.message);
+      alert(err.response?.data?.message || "Unable to delete this document. Please try again.");
 
     }
 
@@ -116,7 +117,9 @@ function DocumentList({ refreshDocs, onQuestionSelect, onDocumentSelect }) {
 
         {
 
-          filteredDocuments.length === 0 ? (
+          loadError ? (
+            <div role="alert" className="flex justify-center items-center h-full text-amber-300">{loadError}</div>
+          ) : filteredDocuments.length === 0 ? (
 
             <div className="flex justify-center items-center h-full text-slate-500">
 

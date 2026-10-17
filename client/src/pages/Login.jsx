@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Bot, Mail, Lock } from "lucide-react";
+import { Bot } from "lucide-react";
 import api from "../services/api";
 
 function Login() {
@@ -10,6 +10,8 @@ function Login() {
     email: "",
     password: "",
   });
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
     setForm({
@@ -20,15 +22,23 @@ function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    setIsSubmitting(true);
 
     try {
       const res = await api.post("/auth/login", form);
 
+      if (!res.data?.token) {
+        throw new Error("The server did not return a login token. Please try again.");
+      }
+
       localStorage.setItem("token", res.data.token);
 
-      navigate("/dashboard");
+      navigate("/dashboard", { replace: true });
     } catch (err) {
-      alert(err.response?.data?.message || "Login Failed");
+      setError(err.response?.data?.message || err.message || "Unable to log in. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -61,6 +71,12 @@ function Login() {
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-5">
+
+          {error && (
+            <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+              {error}
+            </p>
+          )}
 
           {/* Email */}
           <div className="relative">
@@ -97,9 +113,10 @@ function Login() {
 
           <button
             type="submit"
+            disabled={isSubmitting}
             className="w-full h-12 rounded-xl bg-cyan-500 hover:bg-cyan-400 transition font-bold text-slate-950"
           >
-            Login
+            {isSubmitting ? "Logging in..." : "Login"}
           </button>
 
         </form>

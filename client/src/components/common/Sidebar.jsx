@@ -1,4 +1,3 @@
-import { useNavigate } from "react-router-dom";
 import {
   MessageSquare,
   Search,
@@ -51,8 +50,8 @@ const [editedTitle, setEditedTitle] = useState("");
         "activeConversation",
         newConversation._id
       );
-    } catch (err) {
-      console.log(err);
+    } catch {
+      alert("Unable to create a conversation. Please try again.");
     }
   }
 
@@ -86,8 +85,8 @@ const [editedTitle, setEditedTitle] = useState("");
           );
         }
       }
-    } catch (err) {
-      console.log(err);
+    } catch {
+      alert("Unable to delete this conversation. Please try again.");
     }
   }
   // ===========================
@@ -129,9 +128,8 @@ async function handleRename(chatId) {
 
     setEditedTitle("");
 
-  } catch (err) {
-
-    console.log(err);
+  } catch {
+    alert("Unable to rename this conversation. Please try again.");
 
   }
 

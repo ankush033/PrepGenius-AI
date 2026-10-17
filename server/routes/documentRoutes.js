@@ -5,6 +5,8 @@ const router=express.Router();
 const auth=require("../middleware/authMiddleware");
 
 const upload=require("../middleware/uploadMiddleware");
+const rateLimit=require("../middleware/rateLimit");
+const uploadRateLimit=rateLimit({windowMs:60*60*1000,max:10,key:(req)=>`${req.ip}:${req.user?.id||"anonymous"}`});
 
 const {
   uploadDocument,
@@ -14,7 +16,7 @@ const {
 
 router.post(
 
-"/upload",auth,upload.single("pdf"),
+"/upload",auth,uploadRateLimit,upload.single("pdf"),
 
 uploadDocument
 

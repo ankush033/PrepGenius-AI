@@ -25,6 +25,8 @@ function DocumentCard({ document, expanded, onToggle, onDelete, onQuestionSelect
               <CalendarDays size={13} />
               {new Date(document.createdAt).toLocaleDateString()}
             </span>
+            {document.processingStatus === "processing" && <span className="mt-1 block text-xs text-amber-300">Processing document…</span>}
+            {document.processingStatus === "failed" && <span className="mt-1 block text-xs text-red-300">Processing failed. Delete and upload again.</span>}
           </span>
           <ChevronDown
             size={17}
@@ -43,6 +45,7 @@ function DocumentCard({ document, expanded, onToggle, onDelete, onQuestionSelect
 
       {expanded && (
         <div className="border-t border-slate-800 px-3 pb-3 pt-3">
+          {document.processingStatus === "failed" && <p role="alert" className="mb-3 text-sm text-red-300">{document.processingError || "This document could not be processed."}</p>}
           <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Summary</h4>
           <p className="mt-1 whitespace-pre-wrap text-sm leading-5 text-slate-300">
             {document.summary || "Summary unavailable"}

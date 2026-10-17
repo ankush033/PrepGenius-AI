@@ -44,6 +44,8 @@ function ChatWindow({ messages }) {
 
                     sources={msg.sources}
 
+                    turnStatus={msg.turnStatus}
+
                 />
 
             ))}

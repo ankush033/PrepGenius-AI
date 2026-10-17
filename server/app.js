@@ -8,10 +8,15 @@ const chatRoutes = require("./routes/chatRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 
 const app = express();
+const trustedProxyHops = Number.parseInt(process.env.TRUST_PROXY_HOPS, 10);
+app.set(
+  "trust proxy",
+  Number.isInteger(trustedProxyHops) && trustedProxyHops > 0 ? trustedProxyHops : false
+);
 
 app.use(cors());
 
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 
 app.use("/api/auth", authRoutes);
 

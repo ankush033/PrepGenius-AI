@@ -1,4 +1,5 @@
 const Document = require("../models/Document");
+const fs = require("fs/promises");
 
 const loadPDF = require("../rag/pdfLoader");
 const chunkText = require("../rag/chunkText");
@@ -18,6 +19,8 @@ const {
 
 exports.uploadDocument = async (req, res) => {
   let uploadStage = "request validation";
+  let document = null;
+  let vectorWriteStarted = false;
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -40,16 +43,22 @@ exports.uploadDocument = async (req, res) => {
 
     // Load each PDF page separately so page numbers remain available to RAG.
     uploadStage = "PDF text extraction";
-    console.info(`Upload ${req.file.originalname}: extracting PDF text.`);
-    let pages = await loadPDF(req.file.path);
+    console.info("PDF text extraction started.");
+    let pages;
+    try {
+      pages = await loadPDF(req.file.path);
+    } catch {
+      // A valid PDF may be image-only or malformed for text extraction; retain OCR fallback.
+      pages = [];
+    }
     let text = pages.map((page) => page.text).join("\n\n");
 
     if (text.trim().length < 50) {
-      console.info(`Upload ${req.file.originalname}: extracted ${text.trim().length} characters; starting OCR fallback.`);
+      console.info("Extracted text is insufficient; starting OCR fallback.");
       uploadStage = "OCR fallback";
       pages = await extractTextFromPDF(req.file.path);
       text = pages.map((page) => page.text).join("\n\n");
-      console.info(`Upload ${req.file.originalname}: OCR completed (${pages.length} pages, ${text.trim().length} characters).`);
+      console.info(`OCR completed (${pages.length} pages).`);
     }
 
     // Insights improve the document card and chat suggestions, but a temporary
@@ -59,7 +68,7 @@ exports.uploadDocument = async (req, res) => {
     try {
       insights = await generateDocumentInsights(text);
     } catch (insightsError) {
-      console.error("Document insights generation failed; continuing upload:", insightsError);
+      console.error("Document insights generation failed; continuing upload.");
     }
 
     // Clean each page independently, preserving the page number on its chunks.
@@ -78,10 +87,6 @@ exports.uploadDocument = async (req, res) => {
     }));
     text = pages.map((page) => page.text).join("\n\n");
 
-    console.log("========================================");
-    console.log("PDF TEXT (First 500 Characters)");
-    console.log(text.substring(0, 500));
-
     // Chunk
     uploadStage = "chunking";
     const chunks = await chunkText(pages);
@@ -93,10 +98,7 @@ exports.uploadDocument = async (req, res) => {
       });
     }
 
-    console.log("Total Chunks :", chunks.length);
-
-    // Generate Embeddings
-    console.log("Generating Embeddings...");
+    console.info(`Generating embeddings for ${chunks.length} chunks.`);
 
     const embeddings = [];
 
@@ -106,21 +108,18 @@ exports.uploadDocument = async (req, res) => {
 
       embeddings.push(embedding);
 
-      console.log(
-        `Embedding ${embeddings.length}/${chunks.length} Generated`
-      );
     }
 
-    console.log("Embeddings Generated :", embeddings.length);
 
     // Save MongoDB
     uploadStage = "MongoDB document creation";
-    const document = await Document.create({
+    document = await Document.create({
       user: req.user.id,
       fileName: req.file.filename,
       originalName: req.file.originalname,
       namespace: req.user.id,
       vectorCount: embeddings.length,
+      processingStatus: "processing",
       summary: insights.summary,
       suggestedQuestions: insights.suggestedQuestions,
     });
@@ -132,9 +131,8 @@ exports.uploadDocument = async (req, res) => {
     });
 
     // Upload to Pinecone
-    console.log("Uploading to Pinecone...");
-
     uploadStage = "Pinecone vector upsert";
+    vectorWriteStarted = true;
     await storeChunks(
       chunks,
       embeddings,
@@ -143,7 +141,9 @@ exports.uploadDocument = async (req, res) => {
       document.originalName
     );
 
-    console.log("Vectors Uploaded Successfully");
+    document.processingStatus = "ready";
+    document.processingError = "";
+    await document.save();
 
     return res.status(201).json({
       success: true,
@@ -153,12 +153,31 @@ exports.uploadDocument = async (req, res) => {
       document,
     });
   } catch (error) {
-    console.error(`Document upload failed during ${uploadStage}:`, error);
+    console.error(`Document upload failed during ${uploadStage}.`);
+    if (document) {
+      if (vectorWriteStarted) {
+        try {
+          await deleteDocumentVectors(req.user.id, document._id.toString());
+        } catch {
+          console.error("Failed to clean up partial Pinecone upload.");
+        }
+      }
+      try {
+        document.processingStatus = "failed";
+        document.processingError = "Processing failed. You can delete this document and upload it again.";
+        document.vectorCount = 0;
+        await document.save();
+      } catch {
+        console.error("Failed to record document processing failure.");
+      }
+    }
 
     return res.status(500).json({
       success: false,
-      message: `Upload failed during ${uploadStage}: ${error.message || "Unexpected server error."}`,
+      message: `Upload failed during ${uploadStage}. Please retry, or delete the failed document before uploading again.`,
     });
+  } finally {
+    if (req.file?.path) await fs.unlink(req.file.path).catch(() => {});
   }
 };
 
@@ -179,11 +198,11 @@ exports.getDocuments = async (req, res) => {
       documents,
     });
   } catch (err) {
-    console.log(err);
+    console.error("Document listing failed.");
 
     return res.status(500).json({
       success: false,
-      message: err.message,
+      message: "Unable to load documents.",
     });
   }
 };
@@ -194,7 +213,7 @@ exports.getDocuments = async (req, res) => {
 
 exports.deleteDocument = async (req, res) => {
   try {
-    const document = await Document.findById(req.params.id);
+    const document = await Document.findOne({ _id: req.params.id, user: req.user.id });
 
     if (!document) {
       return res.status(404).json({
@@ -203,30 +222,38 @@ exports.deleteDocument = async (req, res) => {
       });
     }
 
-    if (document.user.toString() !== req.user.id) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized",
-      });
-    }
+    // Hide the document from retrieval before vector deletion begins. If the
+    // remote delete times out after a partial effect, a retry can finish it.
+    document.processingStatus = "failed";
+    document.processingError = "Deletion is incomplete. Retry deleting this document.";
+    await document.save();
 
     await deleteDocumentVectors(
       req.user.id,
       document._id.toString()
     );
 
-    await Document.findByIdAndDelete(document._id);
+    try {
+      const deletion = await Document.deleteOne({ _id: document._id, user: req.user.id });
+      if (deletion.deletedCount !== 1) throw new Error("Document record was not deleted.");
+    } catch (databaseError) {
+      document.processingStatus = "failed";
+      document.processingError = "Vector cleanup completed but document cleanup failed. Retry deleting this document.";
+      document.vectorCount = 0;
+      await document.save().catch(() => {});
+      throw databaseError;
+    }
 
     return res.json({
       success: true,
       message: "Document Deleted Successfully",
     });
   } catch (err) {
-    console.error("Delete Document Error:", err);
+    console.error("Delete document failed.");
 
     return res.status(500).json({
       success: false,
-      message: err.message,
+      message: "Unable to delete document. Please retry.",
     });
   }
 };

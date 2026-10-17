@@ -5,6 +5,7 @@ const generateAnswer = require("../services/geminiService");
 
 const Conversation = require("../models/Conversation");
 const Message = require("../models/Message");
+const Document = require("../models/Document");
 // ======================================================
 // Create New Conversation
 // ======================================================
@@ -21,11 +22,11 @@ exports.createConversation = async (req, res) => {
       conversation,
     });
   } catch (error) {
-    console.error("Create Conversation Error:", error);
+    console.error("Create conversation failed.");
 
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Unable to create conversation.",
     });
   }
 };
@@ -47,11 +48,11 @@ exports.getConversations = async (req, res) => {
       conversations,
     });
   } catch (error) {
-    console.error("Get Conversations Error:", error);
+    console.error("Get conversations failed.");
 
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Unable to load conversations.",
     });
   }
 };
@@ -88,11 +89,11 @@ exports.getConversation = async (req, res) => {
       messages,
     });
   } catch (error) {
-    console.error("Get Conversation Error:", error);
+    console.error("Get conversation failed.");
 
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Unable to load conversation.",
     });
   }
 };
@@ -101,6 +102,7 @@ exports.getConversation = async (req, res) => {
 // ======================================================
 
 exports.sendMessage = async (req, res) => {
+  let userMessage = null;
 
   try {
 
@@ -115,6 +117,9 @@ exports.sendMessage = async (req, res) => {
         message: "Question is required",
       });
 
+    }
+    if (typeof question !== "string" || question.length > 4000) {
+      return res.status(400).json({ success: false, message: "Question must be 4,000 characters or fewer." });
     }
 
     const conversation = await Conversation.findOne({
@@ -133,7 +138,14 @@ exports.sendMessage = async (req, res) => {
 
     // Load only completed turns before saving this question. This avoids
     // sending the current user message twice and keeps history chronological.
-    const rawHistory = await Message.find({ conversation: conversationId })
+    const rawHistory = await Message.find({
+      conversation: conversationId,
+      $or: [
+        { role: "assistant" },
+        { role: "user", turnStatus: "complete" },
+        { role: "user", turnStatus: { $exists: false } },
+      ],
+    })
       .sort({ createdAt: -1 })
       .limit(6);
     const chronologicalHistory = rawHistory.reverse();
@@ -152,10 +164,11 @@ exports.sendMessage = async (req, res) => {
     }
     const chatHistory = completedTurns.slice(-3).flat();
 
-    await Message.create({
+    userMessage = await Message.create({
       conversation: conversationId,
       role: "user",
       content: question,
+      turnStatus: "pending",
     });
     // -------------------------
     // Generate Embedding
@@ -172,33 +185,32 @@ const matches = await searchChunks(
   req.user.id
 );
 
-console.log("========== MATCHES ==========");
-
-matches.forEach((m, i) => {
-  console.log({
-    index: i,
-    score: m.score,
-    file: m.metadata?.fileName,
-    text: m.metadata?.text?.substring(0, 80),
-  });
-});
+// Ignore vectors whose upload did not reach the ready state. This also keeps
+// partially written Pinecone data out of retrieval if cleanup later fails.
+const readyDocuments = await Document.find({
+  user: req.user.id,
+  $or: [
+    { processingStatus: "ready" },
+    { processingStatus: { $exists: false } },
+  ],
+}).select("_id");
+const readyDocumentIds = new Set(readyDocuments.map((document) => document._id.toString()));
+const validMatches = matches.filter((match) =>
+  readyDocumentIds.has(String(match.metadata?.documentId || ""))
+);
 
 // Similarity Threshold
 const SIMILARITY_THRESHOLD =
 Number(process.env.SIMILARITY_THRESHOLD) || 0.35;
 
 // Filter Matches
-const filteredMatches = matches.filter(
+const filteredMatches = validMatches.filter(
   (m) => m.score >= SIMILARITY_THRESHOLD
 );
 
 filteredMatches.sort((a, b) => b.score - a.score);
 
 
-console.log(
-  "Filtered Matches:",
-  filteredMatches.length
-);
     let answer = "I couldn't find the answer in the uploaded document.";
 
     let sources = [];
@@ -235,8 +247,6 @@ ${match.metadata.text}
   )
   .join("\n\n-----------------------\n\n");
 
-console.log("========== CONTEXT ==========");
-console.log(context);
 
     if (filteredMatches.length > 0 || chatHistory.length > 0) {
       answer = await generateAnswer(question, context, chatHistory, {
@@ -249,16 +259,6 @@ console.log(context);
   score: Number(match.score.toFixed(3)),
   text: match.metadata.text,
 }));
-   filteredMatches.forEach((match, index) => {
-  console.log(`========== MATCH ${index + 1} ==========`);
-
-  console.log({
-    score: match.score,
-    file: match.metadata.fileName,
-    page: match.metadata.page_number ?? match.metadata.page,
-    text: match.metadata.text.substring(0, 150),
-  });
-});
     } else {
       sendEvent({ type: "token", token: answer });
     }
@@ -299,6 +299,9 @@ console.log(context);
 
     await conversation.save();
 
+    userMessage.turnStatus = "complete";
+    await userMessage.save();
+
     // -------------------------
     // Response
     // -------------------------
@@ -308,16 +311,20 @@ console.log(context);
 
   } catch (error) {
 
-    console.error("Send Message Error:", error);
+    console.error("Send message failed.");
+    if (userMessage) {
+      userMessage.turnStatus = "failed";
+      await userMessage.save().catch(() => {});
+    }
 
     if (res.headersSent) {
       if (!res.writableEnded && !res.destroyed) {
-        res.write(`data: ${JSON.stringify({ type: "error", message: error.message })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: "error", message: "Unable to generate a response. Please try again." })}\n\n`);
         res.end();
       }
       return;
     }
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: "Unable to generate a response. Please try again." });
 
   }
 
@@ -359,11 +366,11 @@ exports.deleteConversation = async (req, res) => {
 
   } catch (error) {
 
-    console.error("Delete Conversation Error:", error);
+    console.error("Delete conversation failed.");
 
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Unable to delete conversation.",
     });
 
   }
@@ -415,11 +422,11 @@ exports.renameConversation = async (req, res) => {
 
   } catch (error) {
 
-   console.error("Rename Conversation Error:", error);
+   console.error("Rename conversation failed.");
 
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Unable to rename conversation.",
     });
 
   }

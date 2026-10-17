@@ -10,6 +10,7 @@ function ChatMessage({
   role,
   text,
   sources = [],
+  turnStatus,
 }) {
 
   const isUser = role === "user";
@@ -53,6 +54,10 @@ function ChatMessage({
 
           )
         }
+
+        {isUser && turnStatus === "failed" && (
+          <p role="status" className="mt-2 text-xs text-red-900">Response failed. You can ask this question again.</p>
+        )}
 
         {
 

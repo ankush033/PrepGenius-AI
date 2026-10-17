@@ -29,6 +29,7 @@ const [showUploadModal, setShowUploadModal] =
   useState(false);
 const [documentQuestions, setDocumentQuestions] = useState([]);
 const [preparingQuestions, setPreparingQuestions] = useState(false);
+const [conversationError, setConversationError] = useState("");
 
 const chatRef = useRef(null);
 const activeConversationId = activeConversation?._id;
@@ -45,12 +46,14 @@ const loadConversation = useCallback(async () => {
       role: msg.role,
       text: msg.content,
       sources: msg.sources || [],
+      turnStatus: msg.turnStatus || "complete",
     }));
 
     setMessages(history);
+    setConversationError("");
     localStorage.setItem("activeConversation", activeConversationId);
-  } catch (err) {
-    console.log(err);
+  } catch {
+    setConversationError("Unable to load this conversation. Please select it again or refresh.");
   }
 }, [activeConversationId]);
 
@@ -133,10 +136,8 @@ async function refreshConversations() {
 
     }
 
-  } catch (err) {
-
-    console.log(err);
-
+  } catch {
+    setConversationError("Unable to refresh conversations. Your response was saved; refresh to update history.");
   }
 
 }
@@ -261,13 +262,11 @@ async function refreshConversations() {
     // Reload messages from DB
     await loadConversation();
 
-  } catch (err) {
-
-    console.log(err);
+  } catch {
 
     setMessages((prev) => prev.map((message) =>
       message.id === streamId
-        ? { ...message, text: message.text || err.message || "Something went wrong." }
+        ? { ...message, text: message.text || "Unable to generate a response. Please try again." }
         : message
     ));
 
@@ -332,6 +331,8 @@ async function refreshConversations() {
         ref={chatRef}
         className="flex-1 min-h-0 overflow-y-auto px-6 py-6 bg-gradient-to-b from-slate-900 to-slate-950"
       >
+
+        {conversationError && <p role="alert" className="mb-4 text-sm text-amber-300">{conversationError}</p>}
 
         <ChatWindow
           messages={messages}

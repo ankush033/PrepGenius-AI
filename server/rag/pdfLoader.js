@@ -11,6 +11,7 @@ const loadPDF = async (filePath) => {
       pagerender: async (pageData) => {
         // pdf-parse calls pagerender sequentially, starting at PDF page 1.
         const pageNumber = ++renderedPageNumber;
+        if (pageNumber > 500) throw new Error("PDF exceeds the 500 page processing limit.");
         const textContent = await pageData.getTextContent({
           normalizeWhitespace: false,
           disableCombineTextItems: false,
@@ -41,7 +42,6 @@ const loadPDF = async (filePath) => {
         .trim(),
     }));
   } catch (error) {
-    console.error(error);
     throw new Error("Failed to extract PDF text");
   }
 };

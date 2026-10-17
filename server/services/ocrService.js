@@ -14,9 +14,7 @@ async function extractTextFromPDF(filePath) {
         page_number,
         text: result.data.text.trim(),
       });
-      console.info(
-        `OCR completed page ${page_number}${totalPages ? `/${totalPages}` : ""} (${result.data.text.trim().length} characters).`
-      );
+      console.info(`OCR completed page ${page_number}${totalPages ? `/${totalPages}` : ""}.`);
     }
   } finally {
     await worker.terminate();

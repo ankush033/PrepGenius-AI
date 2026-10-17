@@ -12,6 +12,7 @@ function Dashboard() {
   const [refreshDocs, setRefreshDocs] = useState(0);
   const [suggestionRequest, setSuggestionRequest] = useState(null);
   const [selectedDocument, setSelectedDocument] = useState(null);
+  const [statsError, setStatsError] = useState("");
 
   const [stats, setStats] = useState({
     documents: 0,
@@ -29,8 +30,9 @@ function Dashboard() {
     try {
       const data = await getDashboardStats();
       setStats(data);
-    } catch (err) {
-      console.log(err);
+      setStatsError("");
+    } catch {
+      setStatsError("Dashboard statistics are temporarily unavailable.");
     }
   }
 
@@ -62,6 +64,7 @@ function Dashboard() {
           {/* Right Panel */}
 
           <aside className="w-[320px] flex flex-col gap-5 h-full">
+            {statsError && <p role="status" className="text-sm text-amber-300">{statsError}</p>}
             <div className="grid grid-cols-2 gap-4">
               <StatsCard
                 title="Documents"

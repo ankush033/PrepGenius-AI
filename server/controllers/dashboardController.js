@@ -41,14 +41,12 @@ exports.getStats = async (req, res) => {
   "vectorCount originalName user"
 );
 
-console.log("Documents:", docs);
 
 const totalVectors = docs.reduce(
   (sum, doc) => sum + (doc.vectorCount || 0),
   0
 );
 
-console.log("Total Vectors:", totalVectors);
     res.status(200).json({
       success: true,
       stats: {
@@ -59,11 +57,11 @@ console.log("Total Vectors:", totalVectors);
       },
     });
   } catch (err) {
-    console.log(err);
+    console.error("Dashboard stats lookup failed.");
 
     res.status(500).json({
       success: false,
-      message: err.message,
+      message: "Unable to load dashboard statistics.",
     });
   }
 };

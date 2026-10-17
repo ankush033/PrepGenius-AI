@@ -15,6 +15,10 @@ async function* convertPDFToImages(filePath) {
     standardFontDataUrl: path.join(pdfjsBuildDirectory, "../../standard_fonts/"),
   });
   const pdfDocument = await loadingTask.promise;
+  if (pdfDocument.numPages > 500) {
+    await pdfDocument.destroy();
+    throw new Error("PDF exceeds the 500 page processing limit.");
+  }
 
   try {
     for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {

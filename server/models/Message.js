@@ -19,6 +19,12 @@ const messageSchema = new mongoose.Schema(
       required: true,
     },
 
+    turnStatus: {
+      type: String,
+      enum: ["pending", "complete", "failed"],
+      default: "complete",
+    },
+
     sources: [
       {
         fileName: {
