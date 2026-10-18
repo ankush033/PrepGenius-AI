@@ -2,6 +2,17 @@ const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
+exports.me = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select("name email");
+        if (!user) return res.status(401).json({ success: false, message: "Invalid Token" });
+        return res.json({ success: true, user: { id: user._id, name: user.name, email: user.email } });
+    } catch (error) {
+        console.error("Session verification failed.");
+        return res.status(500).json({ success: false, message: "Unable to verify session." });
+    }
+};
+
 
 // Register
 

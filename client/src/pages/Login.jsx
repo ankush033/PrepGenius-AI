@@ -2,9 +2,11 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Bot } from "lucide-react";
 import api from "../services/api";
+import { useAuth } from "../context/useAuth";
 
 function Login() {
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const [form, setForm] = useState({
     email: "",
@@ -28,12 +30,11 @@ function Login() {
     try {
       const res = await api.post("/auth/login", form);
 
-      if (!res.data?.token) {
-        throw new Error("The server did not return a login token. Please try again.");
+      if (!res.data?.success || !res.data?.token || !res.data?.user?.id || !res.data?.user?.name || !res.data?.user?.email) {
+        throw new Error("The server returned an incomplete login response. Please try again.");
       }
 
-      localStorage.setItem("token", res.data.token);
-
+      login({ token: res.data.token, user: res.data.user });
       navigate("/dashboard", { replace: true });
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Unable to log in. Please try again.");

@@ -9,6 +9,8 @@ import {
   MoreVertical,
 } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/useAuth";
 
 import {
   createConversation,
@@ -22,6 +24,8 @@ function Sidebar({
   activeConversation,
   setActiveConversation,
 }) {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState(null);
 
@@ -436,11 +440,7 @@ async function handleRename(chatId) {
       {/* Logout */}
       <div className="px-4 pb-4">
         <button
-          onClick={() => {
-            localStorage.removeItem("token");
-            localStorage.removeItem("activeConversation");
-            window.location.href = "/";
-          }}
+          onClick={() => { logout(); navigate("/login", { replace: true }); }}
           className="w-full flex items-center justify-center gap-2 rounded-2xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 py-3 transition"
         >
           <Trash2 size={18} />

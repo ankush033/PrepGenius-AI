@@ -64,3 +64,35 @@ test("login rejects a password that does not match", async () => {
   assert.equal(res.body.message, "Invalid Credentials");
   assert.equal(signed, false);
 });
+
+test("session verification returns only the authenticated user's public fields", async () => {
+  let query;
+  const controller = loadAuthController({
+    "../models/User": { findById: (id) => { query = id; return { select: async (fields) => {
+      assert.equal(fields, "name email");
+      return { _id: "user-1", name: "Test User", email: "test@example.com" };
+    } }; } },
+  });
+  const res = response();
+
+  await controller.me({ user: { id: "user-1" } }, res);
+
+  assert.equal(query, "user-1");
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, {
+    success: true,
+    user: { id: "user-1", name: "Test User", email: "test@example.com" },
+  });
+});
+
+test("session verification rejects a token whose user no longer exists", async () => {
+  const controller = loadAuthController({
+    "../models/User": { findById: () => ({ select: async () => null }) },
+  });
+  const res = response();
+
+  await controller.me({ user: { id: "deleted-user" } }, res);
+
+  assert.equal(res.statusCode, 401);
+  assert.equal(res.body.success, false);
+});

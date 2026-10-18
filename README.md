@@ -147,7 +147,7 @@ Backend variables belong in `server/.env` (or the backend hosting environment). 
 | `GROQ_SUMMARY_MODEL` | Backend, optional | Overrides the document insights model; default is `openai/gpt-oss-20b`. |
 | `SIMILARITY_THRESHOLD` | Backend, optional | Minimum Pinecone match score; effective fallback is `0.35` when unset or falsy. |
 | `TRUST_PROXY_HOPS` | Backend, optional | Positive integer number of trusted proxy hops; default is no trusted proxy. Configure only for a verified deployment topology. |
-| `VITE_API_URL` | Frontend | Backend origin/base URL. The client appends `/api`; do not include `/api` or a trailing slash. |
+| `VITE_API_URL` | Frontend | Backend origin/base URL. For Vercel set `https://prepgenius-ai-9146.onrender.com`; the client appends `/api` and removes a supplied trailing `/api` to prevent duplication. |
 
 Vite variables are embedded in the built client and must not contain secrets. The API keys and JWT secret belong only on the backend.
 
@@ -229,7 +229,7 @@ The server package currently defines `start`, `dev`, and `test`; it does not def
 
 | Symptom | Checks |
 |---|---|
-| Login or other API request fails to connect | Confirm the backend is running and `VITE_API_URL` in `client/.env` is the backend origin without `/api` or a trailing slash. Restart Vite after changing the file. The client defaults to `http://localhost:5000` when it is unset. |
+| Login or other API request fails to connect | Confirm the backend is running and `VITE_API_URL` in `client/.env` is the backend origin. Local `client/.env` can point to `http://localhost:5000`; an unset value defaults to the Render origin. Restart Vite after changing the file. |
 | API URL contains `/api/api` | Remove `/api` from `VITE_API_URL`; the client appends it. |
 | Login succeeds but protected requests return 401 | Sign in again, confirm the browser has a current token, and confirm `JWT_SECRET` is set consistently on the backend. Tokens expire after seven days. |
 | Server exits before listening | Check that `MONGO_URI` is valid, the database is running/reachable, and (for Atlas) the backend network is allowed. Startup waits for MongoDB. |
@@ -264,11 +264,12 @@ The dashboard controller currently returns `aiStatus: "Online"` as a fixed value
 
 ## Deployment notes
 
-No platform-specific deployment manifest or hosting configuration is present in the repository. The following describes the application requirements; provider-specific commands and networking must be verified for the chosen platform.
+The repository includes a Vercel SPA rewrite for the client. The following describes the application requirements; backend hosting commands and networking must be verified for the chosen platform.
 
 Deployment-specific environment, networking, filesystem, proxy, CORS, and build configuration may differ from this local setup; verify the target platform's requirements before deployment.
 
-- Build the frontend with `npm run build` in `client/` and serve `client/dist/` with a static host. Set `VITE_API_URL` to the backend origin before building.
+- For Vercel, set the project Root Directory to `client`, Framework Preset to Vite, Build Command to `npm run build`, and Output Directory to `dist`. Set `VITE_API_URL` to `https://prepgenius-ai-9146.onrender.com` in the Vercel Project Settings for Production (and Preview if used), then redeploy because Vite embeds this value at build time. `client/vercel.json` rewrites frontend routes to `index.html` for React Router.
+- Run the frontend build with `npm run build` from `client/`. The client defaults to the Render origin when `VITE_API_URL` is absent; local development can override it with `client/.env`.
 - Run the backend from `server/` with `npm start`. Configure backend environment variables in the hosting provider's secret/environment settings, ensure the service can reach MongoDB, Pinecone, Gemini, and Groq, and provide a writable `uploads/` directory.
 - Set `PORT` if the platform supplies a port. MongoDB connection is awaited before the server begins listening.
 - If the backend is behind a reverse proxy, determine the actual trusted hop count before setting `TRUST_PROXY_HOPS`; this affects client IP detection used by rate limits.
